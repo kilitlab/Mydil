@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#16233F">
+<title>MyDil</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#EDF0F5; --surface:#FFFFFF; --ink:#16233F; --muted:#5F6B80; --line:#D3D9E3;
+  --me:#3554D1; --me-soft:#E3E8FB; --me-ink:#FFFFFF;
+  --them:#D9861C; --them-soft:#FBEEDB; --them-ink:#1E1404;
+  --danger:#C23B32; --ok:#2F8A57;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0F1626; --surface:#18223A; --ink:#E7ECF5; --muted:#97A3B9; --line:#2A3651;
+    --me:#7D94F5; --me-soft:#23305A; --me-ink:#0D1428;
+    --them:#F0A84A; --them-soft:#3A2C17; --them-ink:#1E1404;
+    --danger:#E8675D; --ok:#5BC08A;
+  }
+}
+*,*::before,*::after{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font:16px/1.45 "Atkinson Hyperlegible",system-ui,sans-serif;-webkit-tap-highlight-color:transparent}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible,input:focus-visible,textarea:focus-visible{outline:3px solid var(--them);outline-offset:2px}
+.app{height:100%;max-width:640px;margin:0 auto;display:flex;flex-direction:column;
+  padding-top:env(safe-area-inset-top);padding-bottom:env(safe-area-inset-bottom)}
+
+/* Header */
+header{display:flex;align-items:center;gap:10px;padding:12px 16px 6px}
+.brand{font-family:"Bricolage Grotesque",sans-serif;font-weight:800;font-size:26px;letter-spacing:-.02em;flex:1}
+.brand span{color:var(--me)}
+.cost{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:6px 12px;font-size:14px;font-variant-numeric:tabular-nums}
+.cost.warn{border-color:var(--danger);color:var(--danger)}
+.icon-btn{width:40px;height:40px;border-radius:12px;border:1px solid var(--line);background:var(--surface);display:grid;place-items:center}
+
+/* Controls */
+.controls{padding:4px 16px 8px;display:flex;flex-direction:column;gap:8px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.row .lbl{font-size:13px;color:var(--muted);width:52px}
+.seg{display:flex;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:3px;flex:1}
+.seg button{flex:1;border:0;background:transparent;border-radius:9px;padding:7px 4px;font-size:14px;font-weight:700}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+
+/* Feed */
+.feed{flex:1;overflow-y:auto;padding:8px 16px 12px;display:flex;flex-direction:column;gap:10px}
+.hint{margin:auto;text-align:center;color:var(--muted);max-width:340px;padding:24px 8px}
+.hint b{color:var(--ink)}
+.msg{max-width:88%;border-radius:16px;padding:10px 12px;position:relative}
+.msg.me{align-self:flex-end;background:var(--me-soft);border-bottom-right-radius:4px}
+.msg.them{align-self:flex-start;background:var(--them-soft);border-bottom-left-radius:4px}
+.msg .orig{font-size:13px;color:var(--muted);margin:0 0 4px}
+.msg .tr{font-size:20px;line-height:1.35;margin:0;font-weight:700}
+.msg .back{font-size:13px;color:var(--muted);margin:6px 0 0;border-top:1px dashed var(--line);padding-top:6px}
+.msg .note{font-size:13px;margin:6px 0 0;padding:6px 8px;border-radius:8px;background:var(--surface)}
+.msg .tools{display:flex;gap:6px;margin-top:8px}
+.msg .tools button{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:4px 10px;font-size:13px}
+.msg.pending .tr{color:var(--muted);font-weight:400;font-style:italic}
+.msg.err .tr{color:var(--danger);font-size:15px;font-weight:400}
+.who{font-size:12px;font-weight:700;margin-bottom:2px}
+.me .who{color:var(--me)} .them .who{color:var(--them)}
+
+/* Quick phrases */
+.quick{display:flex;gap:8px;overflow-x:auto;padding:6px 16px;scrollbar-width:none}
+.quick::-webkit-scrollbar{display:none}
+.quick button{flex:none;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:7px 12px;font-size:14px}
+
+/* Notice */
+.notice{margin:0 16px 6px;padding:10px 12px;border-radius:12px;border:1px solid var(--danger);background:var(--surface);font-size:14px;display:none}
+.notice.show{display:block}
+.notice button{margin-top:6px;border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:4px 10px;font-size:13px}
+
+/* Talk bar */
+.live{min-height:22px;padding:0 16px;font-size:14px;color:var(--muted);font-style:italic}
+.talk{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:6px 16px 14px}
+.talk button{height:84px;border:0;border-radius:20px;font-weight:700;font-size:17px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
+.talk button small{font-size:13px;font-weight:400;opacity:.85}
+#btnMe{background:var(--me);color:var(--me-ink)}
+#btnThem{background:var(--them);color:var(--them-ink)}
+.talk button.rec{outline:4px solid var(--danger);outline-offset:2px;animation:pulse 1.4s ease-in-out infinite}
+@keyframes pulse{50%{outline-color:transparent}}
+@media (prefers-reduced-motion: reduce){.talk button.rec{animation:none}}
+.typebar{display:none;gap:8px;padding:0 16px 12px}
+.typebar.show{display:flex}
+.typebar textarea{flex:1;border:1px solid var(--line);border-radius:12px;background:var(--surface);color:var(--ink);padding:10px;font:inherit;resize:none;height:48px}
+.typebar button{border:0;border-radius:12px;padding:0 14px;font-weight:700;background:var(--ink);color:var(--bg)}
+
+/* Overlays */
+.overlay{position:fixed;inset:0;background:var(--bg);z-index:10;display:none;flex-direction:column;padding:calc(16px + env(safe-area-inset-top)) 16px calc(16px + env(safe-area-inset-bottom))}
+.overlay.show{display:flex}
+.big{flex:1;display:flex;align-items:center;justify-content:center;text-align:center;font-family:"Bricolage Grotesque",sans-serif;font-weight:800;font-size:clamp(28px,8vw,52px);line-height:1.2;overflow:auto}
+.overlay .close{align-self:flex-end}
+.sheet h2{font-family:"Bricolage Grotesque",sans-serif;font-size:24px;margin:4px 0 12px}
+.sheet label{display:block;font-weight:700;margin:14px 0 4px}
+.sheet .help{font-size:13px;color:var(--muted);margin:2px 0 0}
+.sheet input{width:100%;border:1px solid var(--line);border-radius:12px;background:var(--surface);color:var(--ink);padding:12px;font:inherit}
+.sheet .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+.sheet .actions button{border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:10px 14px}
+.sheet .actions .primary{background:var(--ink);color:var(--bg);border-color:var(--ink);font-weight:700}
+.sheet .stat{display:flex;justify-content:space-between;border-bottom:1px solid var(--line);padding:8px 0;font-variant-numeric:tabular-nums}
+.scroll{overflow-y:auto;flex:1}
+.status{font-size:14px;margin-top:8px;min-height:20px}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">My<span>Dil</span></div>
+    <button class="cost" id="costChip" title="Bu oturumun maliyeti">$0.0000</button>
+    <button class="icon-btn" id="openSettings" aria-label="Ayarlar">⚙</button>
+  </header>
+
+  <div class="controls">
+    <div class="row"><span class="lbl">Dil</span><div class="seg" id="langSeg" role="group" aria-label="Karşı tarafın dili"></div></div>
+    <div class="row"><span class="lbl">Ton</span><div class="seg" id="toneSeg" role="group" aria-label="Konuşma tonu">
+      <button data-v="resmi" aria-pressed="false">Resmi</button>
+      <button data-v="notr" aria-pressed="true">Nötr</button>
+      <button data-v="samimi" aria-pressed="false">Samimi</button>
+    </div></div>
+    <div class="row"><span class="lbl">Çıktı</span><div class="seg" id="outSeg" role="group" aria-label="Çeviri nasıl verilsin">
+      <button data-v="yazi" aria-pressed="false">Yazı</button>
+      <button data-v="ses" aria-pressed="false">Ses</button>
+      <button data-v="ikisi" aria-pressed="true">İkisi</button>
+    </div></div>
+  </div>
+
+  <div class="notice" id="notice"></div>
+
+  <main class="feed" id="feed" aria-live="polite">
+    <div class="hint" id="hint">
+      <b>Mavi buton</b> senin için: bas, Türkçe konuş, tekrar bas.<br>
+      <b>Turuncu buton</b> karşı taraf için: o kendi dilinde konuşur, sana Türkçesi gelir.<br><br>
+      Her çevirinin altındaki <b>Göster</b> ile yazıyı büyütüp telefonu karşıya çevirebilirsin.
+    </div>
+  </main>
+
+  <div class="quick" id="quick"></div>
+  <div class="live" id="live"></div>
+
+  <div class="typebar" id="typebar">
+    <textarea id="typeBox" placeholder="Yaz veya klavyenin mikrofonunu kullan…"></textarea>
+    <button id="typeSend">Çevir</button>
+  </div>
+
+  <div class="talk">
+    <button id="btnMe"><span>Ben konuşuyorum</span><small id="meSub">Türkçe → Almanca</small></button>
+    <button id="btnThem"><span>Karşı taraf</span><small id="themSub">Almanca → Türkçe</small></button>
+  </div>
+</div>
+
+<!-- Büyük gösterim -->
+<div class="overlay" id="bigView" role="dialog" aria-label="Büyük gösterim">
+  <button class="icon-btn close" id="closeBig" aria-label="Kapat">✕</button>
+  <div class="big" id="bigText"></div>
+</div>
+
+<!-- Ayarlar -->
+<div class="overlay sheet" id="settings" role="dialog" aria-label="Ayarlar">
+  <button class="icon-btn close" id="closeSettings" aria-label="Kapat">✕</button>
+  <div class="scroll">
+    <h2>Ayarlar</h2>
+
+    <label for="apiKey">API anahtarı</label>
+    <input id="apiKey" type="password" autocomplete="off" placeholder="sk-ant-...">
+    <p class="help">Sadece bu telefonda saklanır, hiçbir yere yüklenmez.</p>
+    <div class="actions">
+      <button class="primary" id="saveKey">Kaydet ve test et</button>
+      <button id="showKey">Göster</button>
+    </div>
+    <div class="status" id="keyStatus"></div>
+
+    <label for="budget">Oturum bütçesi ($)</label>
+    <input id="budget" type="number" min="0.01" step="0.05" inputmode="decimal">
+    <p class="help">Bu tutara ulaşınca çeviri otomatik durur. Sayaç yeni oturumda sıfırlanır.</p>
+
+    <label for="maxSec">En uzun kayıt (saniye)</label>
+    <input id="maxSec" type="number" min="5" max="120" step="5" inputmode="numeric">
+    <p class="help">Butona tekrar basmayı unutursan kayıt bu sürede kendiliğinden durur.</p>
+
+    <label>Çeviri kalitesi</label>
+    <div class="seg" id="kaliteSeg" role="group" aria-label="Çeviri kalitesi">
+      <button data-v="kaliteli" aria-pressed="true">Kaliteli</button>
+      <button data-v="ekonomik" aria-pressed="false">Ekonomik</button>
+    </div>
+    <p class="help">Kaliteli: doğal, akıcı çeviri, cümle başı yaklaşık 0,2 sent. Ekonomik: 20 kat ucuz ama daha düz.</p>
+
+    <label>Harcama</label>
+    <div class="stat"><span>Bu oturum</span><span id="stSession">$0</span></div>
+    <div class="stat"><span>Toplam (bu telefonda)</span><span id="stTotal">$0</span></div>
+    <div class="stat"><span>Çeviri sayısı</span><span id="stCount">0</span></div>
+
+    <div class="actions">
+      <button id="newSession">Yeni oturum başlat</button>
+      <button id="toggleType">Yazarak çeviri: kapalı</button>
+      <button id="toggleKontrol">Kontrol çevirisi: kapalı</button>
+      <button id="clearHistory">Konuşmayı temizle</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+"use strict";
+
+/* ---------- Diller: yeni dil eklemek için bu listeye bir satır ekle ---------- */
+const DILLER = [
+  { kod:"de", ad:"Almanca",   kisa:"DE", ses:"de-DE",
+    hazir:{ anlamadim:"Entschuldigung, das habe ich nicht verstanden. Könnten Sie es bitte langsamer und einfacher sagen?",
+            uygulama:"Ich benutze eine Übersetzungs-App. Bitte sprechen Sie langsam und deutlich.",
+            bekle:"Einen Moment, bitte." } },
+  { kod:"en", ad:"İngilizce", kisa:"EN", ses:"en-US",
+    hazir:{ anlamadim:"Sorry, I didn't understand. Could you please say that more slowly and simply?",
+            uygulama:"I'm using a translation app. Please speak slowly and clearly.",
+            bekle:"One moment, please." } },
+  { kod:"es", ad:"İspanyolca", kisa:"ES", ses:"es-ES",
+    hazir:{ anlamadim:"Perdón, no le entendí. ¿Podría decirlo más despacio y de forma más sencilla?",
+            uygulama:"Estoy usando una aplicación de traducción. Por favor, hable despacio y con claridad.",
+            bekle:"Un momento, por favor." } }
+];
+const HAZIR_ETIKET = { uygulama:"Çeviri uygulaması kullanıyorum", anlamadim:"Anlamadım, yavaş söyle", bekle:"Bir dakika lütfen" };
+
+const MODELLER = {
+  kaliteli:  { id:"claude-sonnet-5-5", girdi:2/1e6,    cikti:10/1e6 },  // doğal, akıcı çeviri
+  ekonomik:  { id:"claude-haiku-5-5",  girdi:0.10/1e6, cikti:0.50/1e6 } // çok ucuz, daha düz
+};
+const aktifModel = () => MODELLER[ayar.kalite] || MODELLER.kaliteli;
+
+/* ---------- Kayıtlı durum ---------- */
+const store = {
+  get(k,d){ try{ const v=localStorage.getItem("mydil."+k); return v===null?d:JSON.parse(v); }catch(e){ return d; } },
+  set(k,v){ try{ localStorage.setItem("mydil."+k, JSON.stringify(v)); }catch(e){} }
+};
+let ayar = {
+  dil: store.get("dil","de"), ton: store.get("ton","notr"), cikti: store.get("cikti","ikisi"),
+  butce: store.get("butce",0.50), maxSn: store.get("maxSn",30), yazma: store.get("yazma",false),
+  kalite: store.get("kalite","kaliteli"), kontrol: store.get("kontrol",false)
+};
+let anahtar = store.get("anahtar","");
+let oturumMaliyet = store.get("oturum",0);
+let toplamMaliyet = store.get("toplam",0);
+let ceviriSayisi = store.get("sayi",0);
+let gecmis = store.get("gecmis",[]); // {kim, orig, tr, back, note, dil}
+
+const $ = id => document.getElementById(id);
+const feed=$("feed"), hint=$("hint"), live=$("live"), notice=$("notice");
+const dilBul = k => DILLER.find(d=>d.kod===k) || DILLER[0];
+
+/* ---------- Arayüz kurulumu ---------- */
+DILLER.forEach(d=>{
+  const b=document.createElement("button"); b.dataset.v=d.kod; b.textContent=d.kisa; b.title=d.ad;
+  $("langSeg").appendChild(b);
+});
+function segBagla(id, alan){
+  const seg=$(id);
+  const yenile=()=>seg.querySelectorAll("button").forEach(b=>b.setAttribute("aria-pressed", b.dataset.v===ayar[alan]?"true":"false"));
+  seg.addEventListener("click",e=>{
+    const b=e.target.closest("button"); if(!b||kayitta) return;
+    ayar[alan]=b.dataset.v; store.set(alan,ayar[alan]); yenile(); arayuzYenile();
+  });
+  yenile();
+}
+segBagla("langSeg","dil"); segBagla("toneSeg","ton"); segBagla("outSeg","cikti"); segBagla("kaliteSeg","kalite");
+
+function arayuzYenile(){
+  const d=dilBul(ayar.dil);
+  $("meSub").textContent="Türkçe → "+d.ad;
+  $("themSub").textContent=d.ad+" → Türkçe";
+  const q=$("quick"); q.innerHTML="";
+  Object.keys(HAZIR_ETIKET).forEach(k=>{
+    const b=document.createElement("button"); b.textContent=HAZIR_ETIKET[k];
+    b.onclick=()=>{ seslendir(d.hazir[k], d.ses); buyukGoster(d.hazir[k]); };
+    q.appendChild(b);
+  });
+  $("typebar").classList.toggle("show", !!ayar.yazma || !SR);
+  $("toggleType").textContent="Yazarak çeviri: "+(ayar.yazma?"açık":"kapalı");
+  $("toggleKontrol").textContent="Kontrol çevirisi: "+(ayar.kontrol?"açık":"kapalı");
+  maliyetGoster();
+}
+
+function maliyetGoster(){
+  const chip=$("costChip");
+  chip.textContent="$"+oturumMaliyet.toFixed(4);
+  chip.classList.toggle("warn", oturumMaliyet >= ayar.butce*0.8);
+  $("stSession").textContent="$"+oturumMaliyet.toFixed(4)+" / $"+Number(ayar.butce).toFixed(2);
+  $("stTotal").textContent="$"+toplamMaliyet.toFixed(4);
+  $("stCount").textContent=String(ceviriSayisi);
+}
+
+function uyari(metin, butonYazi, butonIs){
+  notice.innerHTML=""; notice.append(document.createTextNode(metin));
+  if(butonYazi){ const b=document.createElement("button"); b.textContent=butonYazi; b.onclick=butonIs; notice.append(document.createElement("br"), b); }
+  notice.classList.add("show");
+}
+function uyariKapat(){ notice.classList.remove("show"); }
+
+/* ---------- Mesaj balonları ---------- */
+function balon(m){
+  hint.style.display="none";
+  const el=document.createElement("article");
+  el.className="msg "+(m.kim==="ben"?"me":"them");
+  const d=dilBul(m.dil);
+  el.innerHTML='<div class="who"></div><p class="orig"></p><p class="tr"></p>';
+  el.querySelector(".who").textContent = m.kim==="ben" ? "Sen → "+d.ad : d.ad+" → Türkçe";
+  el.querySelector(".orig").textContent=m.orig;
+  m.el=el; balonDoldur(m);
+  feed.appendChild(el); feed.scrollTop=feed.scrollHeight;
+  return el;
+}
+function balonDoldur(m){
+  const el=m.el, tr=el.querySelector(".tr");
+  el.querySelectorAll(".back,.note,.tools").forEach(x=>x.remove());
+  el.classList.remove("pending","err");
+  if(m.durum==="bekliyor"){ el.classList.add("pending"); tr.textContent="çevriliyor…"; return; }
+  if(m.durum==="hata"){ el.classList.add("err"); tr.textContent=m.hata;
+    const t=document.createElement("div"); t.className="tools";
+    const b=document.createElement("button"); b.textContent="Tekrar dene"; b.onclick=()=>cevir(m); t.append(b); el.append(t); return; }
+  tr.textContent=m.tr;
+  if(m.kim==="ben" && m.back && ayar.kontrol){ const p=document.createElement("p"); p.className="back"; p.textContent="Karşı taraf bunu anlayacak: "+m.back; el.append(p); }
+  if(m.note){ const p=document.createElement("p"); p.className="note"; p.textContent="💡 "+m.note; el.append(p); }
+  const t=document.createElement("div"); t.className="tools";
+  const d=dilBul(m.dil);
+  const dinle=document.createElement("button"); dinle.textContent="🔊 Dinle";
+  dinle.onclick=()=>seslendir(m.tr, m.kim==="ben"?d.ses:"tr-TR");
+  t.append(dinle);
+  if(m.kim==="ben"){ const g=document.createElement("button"); g.textContent="⤢ Göster"; g.onclick=()=>buyukGoster(m.tr); t.append(g); }
+  el.append(t);
+}
+
+/* ---------- Seslendirme ---------- */
+function seslendir(metin, dilKodu){
+  if(!("speechSynthesis" in window) || !metin) return;
+  speechSynthesis.cancel();
+  const u=new SpeechSynthesisUtterance(metin); u.lang=dilKodu;
+  const ses=speechSynthesis.getVoices().find(v=>v.lang && v.lang.replace("_","-").toLowerCase().startsWith(dilKodu.slice(0,2).toLowerCase()));
+  if(ses) u.voice=ses;
+  u.rate=0.95; speechSynthesis.speak(u);
+}
+if("speechSynthesis" in window){ speechSynthesis.getVoices(); speechSynthesis.onvoiceschanged=()=>{}; }
+
+function buyukGoster(metin){ $("bigText").textContent=metin; $("bigView").classList.add("show"); }
+$("closeBig").onclick=()=>$("bigView").classList.remove("show");
+
+/* ---------- Yapay zeka çevirisi ---------- */
+const TON = {
+  resmi:"resmi ve kibar; iş görüşmesi, resmi daire, tedarikçi gibi. Almancada 'Sie', İspanyolcada 'usted', İngilizcede kibar kalıplar.",
+  notr:"günlük ve doğal; tanımadığın ama rahat konuştuğun biriyle konuşur gibi. Almancada varsayılan olarak 'Sie'.",
+  samimi:"samimi ve sıcak; arkadaşla konuşur gibi. Almancada 'du', İspanyolcada 'tú'."
+};
+
+function istemOlustur(m){
+  const d=dilBul(m.dil);
+  const baglam=gecmis.filter(x=>x!==m && x.durum==="tamam").slice(-6)
+    .map(x=>(x.kim==="ben"?"Kullanıcı (Türkçe): ":"Karşı taraf ("+dilBul(x.dil).ad+"): ")+x.orig).join("\n") || "(yok, konuşma yeni başlıyor)";
+  const ortak=`Sen deneyimli bir simultane tercümansın. Türk bir kullanıcı ile ${d.ad} konuşan biri arasında yüz yüze tercümanlık yapıyorsun.
+
+Temel kurallar:
+- Kelime kelime çevirme. Cümlenin ANLAMINI ve NİYETİNİ al, hedef dilin anadili konuşanı o durumda bunu nasıl söylerse öyle söyle.
+- Konuşma dilinde çevir: kısa, akıcı, doğal. Yazı dili, kitap dili veya sözlük dili kullanma.
+- Girdi telefonun ses tanımasından geliyor; noktalama yok, kelimeler yanlış duyulmuş olabilir. Bağlamdan en olası anlamı çıkar ve sessizce düzelt.
+- Rakam, fiyat, miktar, tarih, saat ve özel isimleri kesinlikle doğru aktar.`;
+  let gorev, sema;
+  if(m.kim==="ben"){
+    gorev=`${ortak}
+- Ton: ${TON[ayar.ton]}
+
+Kullanıcı Türkçe konuştu. Bunu karşı tarafa ${d.ad} olarak söyleyeceksin.`;
+    sema = ayar.kontrol
+      ? `{"ceviri": "karşı tarafa söylenecek doğal ${d.ad} cümle", "geri": "bu ${d.ad} cümlenin anadili Türkçe olan birinin ağzından çıkacak doğal Türkçe karşılığı", "not": ""}`
+      : `{"ceviri": "karşı tarafa söylenecek doğal ${d.ad} cümle", "not": ""}`;
+  } else {
+    gorev=`${ortak}
+- Türkçe çeviri, İstanbul'da yaşayan bir Türk'ün günlük konuşmada kuracağı cümle gibi olsun: doğal kelime sırası, gerçek Türkçe deyimler. Asla çeviri kokmasın.
+- Karşı taraf "Sie" ile hitap ettiyse "siz", "du" ile hitap ettiyse "sen" kullan.
+
+Karşı taraf ${d.ad} konuştu. Bunu kullanıcıya Türkçe aktaracaksın.`;
+    sema=`{"ceviri": "doğal Türkçe çeviri", "not": ""}`;
+  }
+  return `${gorev}
+
+Önceki konuşma (sadece bağlamı anlamak için, bunları çevirme):
+${baglam}
+
+Çevrilecek: ${m.orig}
+
+"not" alanını neredeyse her zaman boş bırak. Sadece gerçekten önemli bir durum varsa doldur: cümle kaba veya soğuk söylendiyse, ironi varsa, ya da kullanıcının cümlesi kültürel olarak yanlış anlaşılabilecekse. O zaman tek kısa Türkçe cümle yaz.
+
+Yalnızca tek bir JSON nesnesi yaz, başka hiçbir şey yazma:
+${sema}`;
+}
+
+async function cevir(m){
+  if(!anahtar){ m.durum="hata"; m.hata="Önce Ayarlar'dan API anahtarını gir."; balonDoldur(m); ayarlariAc(); return; }
+  if(oturumMaliyet >= ayar.butce){
+    m.durum="hata"; m.hata="Oturum bütçesi doldu, çeviri durduruldu."; balonDoldur(m);
+    uyari("Bu oturum için belirlediğin $"+Number(ayar.butce).toFixed(2)+" bütçe doldu.","Yeni oturum başlat",yeniOturum);
+    return;
+  }
+  m.durum="bekliyor"; balonDoldur(m);
+  try{
+    const r=await fetch("https://api.anthropic.com/v1/messages",{
+      method:"POST",
+      headers:{ "content-type":"application/json", "x-api-key":anahtar, "anthropic-version":"2023-06-01",
+                "anthropic-dangerous-direct-browser-access":"true" },
+      body:JSON.stringify({ model:aktifModel().id, max_tokens:500, messages:[{role:"user", content:istemOlustur(m)}] })
+    });
+    const veri=await r.json().catch(()=>({}));
+    if(!r.ok){ throw new Error(hataMetni(r.status, veri)); }
+    const u=veri.usage||{};
+    const fm=aktifModel(); const maliyet=(u.input_tokens||0)*fm.girdi + (u.output_tokens||0)*fm.cikti;
+    oturumMaliyet+=maliyet; toplamMaliyet+=maliyet; ceviriSayisi++;
+    store.set("oturum",oturumMaliyet); store.set("toplam",toplamMaliyet); store.set("sayi",ceviriSayisi);
+    maliyetGoster();
+    const metin=(veri.content||[]).filter(c=>c.type==="text").map(c=>c.text).join("");
+    const j=jsonCoz(metin);
+    m.tr=(j.ceviri||metin).trim(); m.back=(j.geri||"").trim(); m.note=(j.not||"").trim();
+    m.durum="tamam"; balonDoldur(m); kaydet();
+    if(ayar.cikti!=="yazi"){ seslendir(m.tr, m.kim==="ben"?dilBul(m.dil).ses:"tr-TR"); }
+    if(ayar.cikti==="ses"){ m.el.querySelector(".tr").textContent="🔊 seslendirildi"; m.el.querySelector(".tr").onclick=()=>{ m.el.querySelector(".tr").textContent=m.tr; }; }
+    if(oturumMaliyet >= ayar.butce*0.8 && oturumMaliyet < ayar.butce) uyari("Oturum bütçesinin %80'i kullanıldı.");
+  }catch(e){
+    m.durum="hata"; m.hata=e.message||"Bağlantı hatası, internetini kontrol et."; balonDoldur(m);
+  }
+  feed.scrollTop=feed.scrollHeight;
+}
+function hataMetni(st, v){
+  const msg=(v&&v.error&&v.error.message)||"";
+  if(st===401) return "API anahtarı geçersiz. Ayarlar'dan kontrol et.";
+  if(st===403) return "Bu anahtarın yetkisi yok. Ayarlar'dan kontrol et.";
+  if(st===429) return "Çok hızlı istek gitti, birkaç saniye bekle.";
+  if(st===400 && /credit|balance/i.test(msg)) return "Console bakiyen bitmiş olabilir.";
+  if(st===529 || st>=500) return "Servis şu an yoğun, tekrar dene.";
+  return "Çeviri başarısız ("+st+").";
+}
+function jsonCoz(t){
+  try{ return JSON.parse(t); }catch(e){}
+  const a=t.indexOf("{"), b=t.lastIndexOf("}");
+  if(a>=0&&b>a){ try{ return JSON.parse(t.slice(a,b+1)); }catch(e){} }
+  return {};
+}
+function kaydet(){
+  store.set("gecmis", gecmis.filter(x=>x.durum==="tamam").slice(-80).map(({kim,orig,tr,back,note,dil})=>({kim,orig,tr,back,note,dil,durum:"tamam"})));
+}
+function yeniCeviri(kim, metin){
+  metin=(metin||"").trim(); if(!metin) return;
+  uyariKapat();
+  const m={kim, orig:metin, dil:ayar.dil, durum:"bekliyor"};
+  gecmis.push(m); balon(m); cevir(m);
+}
+
+/* ---------- Ses tanıma ---------- */
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+let tanima=null, kayitta=null, birikmis="", sureSayaci=null, sessizlik=null;
+
+function kayitBaslat(kim){
+  if(!SR){ uyari("Bu tarayıcı ses tanımayı desteklemiyor. Yazarak çeviri kutusunu kullan."); return; }
+  if(kayitta){ kayitBitir(); return; }
+  if("speechSynthesis" in window) speechSynthesis.cancel();
+  kayitta=kim; birikmis="";
+  const btn=$(kim==="ben"?"btnMe":"btnThem"); btn.classList.add("rec");
+  btn.querySelector("span").textContent="Bitirmek için bas";
+  tanima=new SR();
+  tanima.lang = kim==="ben" ? "tr-TR" : dilBul(ayar.dil).ses;
+  tanima.continuous=true; tanima.interimResults=true;
+  tanima.onresult=e=>{
+    // Android Chrome her parçada cümlenin tamamını tekrar gönderebiliyor:
+    // bir parça öncekini içeriyorsa onun yerine geçer, içermiyorsa yeni cümle olarak eklenir.
+    const parcalar=[]; let ara="";
+    for(let i=0;i<e.results.length;i++){
+      const r=e.results[i], t=r[0].transcript.trim(); if(!t) continue;
+      if(!r.isFinal){ ara=t; continue; }
+      parcaEkle(parcalar,t);
+    }
+    birikmis=parcalar.join(" ");
+    let goster=birikmis;
+    if(ara){ const tmp=parcalar.slice(); parcaEkle(tmp,ara); goster=tmp.join(" "); }
+    live.textContent=goster;
+    clearTimeout(sessizlik); sessizlik=setTimeout(kayitBitir, 3500); // 3,5 sn sessizlikte otomatik bitir
+  };
+  tanima.onerror=e=>{
+    if(e.error==="not-allowed"||e.error==="service-not-allowed") uyari("Mikrofon izni yok. Adres çubuğundaki ayar simgesinden mikrofona izin ver.");
+    else if(e.error==="no-speech") live.textContent="Ses duyulmadı.";
+    else if(e.error==="network") uyari("Ses tanıma için internet gerekiyor.");
+  };
+  tanima.onend=()=>{ if(kayitta) kayitBitir(true); };
+  try{ tanima.start(); live.textContent="Dinliyorum…"; }catch(err){ kayitBitir(); }
+  sureSayaci=setTimeout(kayitBitir, Math.max(5,Number(ayar.maxSn)||30)*1000);
+}
+function parcaEkle(liste,t){
+  const kucuk=s=>s.toLocaleLowerCase("tr").replace(/[.,!?;:]/g,"").replace(/\s+/g," ").trim();
+  const son=liste[liste.length-1];
+  if(son!==undefined){
+    const a=kucuk(son), b=kucuk(t);
+    if(b.startsWith(a)){ liste[liste.length-1]=t; return; }   // yeni parça eskisini kapsıyor
+    if(a.startsWith(b)) return;                               // eski zaten daha uzun
+  }
+  liste.push(t);
+}
+function kayitBitir(kendiligindenBitti){
+  if(!kayitta) return;
+  const kim=kayitta; kayitta=null;
+  clearTimeout(sureSayaci); clearTimeout(sessizlik);
+  ["btnMe","btnThem"].forEach(id=>$(id).classList.remove("rec"));
+  $("btnMe").querySelector("span").textContent="Ben konuşuyorum";
+  $("btnThem").querySelector("span").textContent="Karşı taraf";
+  const metin=(birikmis || live.textContent.replace(/^Dinliyorum…$|^Ses duyulmadı\.$/,"")).trim();
+  try{ if(!kendiligindenBitti && tanima) tanima.stop(); }catch(e){}
+  tanima=null; live.textContent="";
+  if(metin) yeniCeviri(kim, metin);
+}
+$("btnMe").onclick=()=>kayitta && kayitta!=="ben" ? kayitBitir() : kayitBaslat("ben");
+$("btnThem").onclick=()=>kayitta && kayitta!=="them" ? kayitBitir() : kayitBaslat("them");
+
+/* Yazarak çeviri */
+$("typeSend").onclick=()=>{ const v=$("typeBox").value; $("typeBox").value=""; yeniCeviri("ben", v); };
+$("typeBox").addEventListener("keydown",e=>{ if(e.key==="Enter"&&!e.shiftKey){ e.preventDefault(); $("typeSend").click(); } });
+
+/* ---------- Ayarlar ---------- */
+function ayarlariAc(){
+  $("apiKey").value=anahtar; $("budget").value=ayar.butce; $("maxSec").value=ayar.maxSn;
+  $("keyStatus").textContent = anahtar ? "Anahtar kayıtlı." : "Henüz anahtar girilmedi.";
+  maliyetGoster(); $("settings").classList.add("show");
+}
+function ayarlariKapat(){
+  const b=parseFloat($("budget").value); if(b>0){ ayar.butce=b; store.set("butce",b); }
+  const s=parseInt($("maxSec").value,10); if(s>=5){ ayar.maxSn=Math.min(120,s); store.set("maxSn",ayar.maxSn); }
+  $("settings").classList.remove("show"); arayuzYenile();
+}
+$("openSettings").onclick=ayarlariAc; $("costChip").onclick=ayarlariAc; $("closeSettings").onclick=ayarlariKapat;
+$("showKey").onclick=()=>{ const i=$("apiKey"); i.type=i.type==="password"?"text":"password"; };
+$("saveKey").onclick=async()=>{
+  const k=$("apiKey").value.trim();
+  if(!k.startsWith("sk-ant-")){ $("keyStatus").textContent="Anahtar 'sk-ant-' ile başlamalı."; return; }
+  $("keyStatus").textContent="Test ediliyor…";
+  try{
+    const r=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",
+      headers:{"content-type":"application/json","x-api-key":k,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
+      body:JSON.stringify({model:aktifModel().id,max_tokens:5,messages:[{role:"user",content:"ping"}]})});
+    const v=await r.json().catch(()=>({}));
+    if(!r.ok){ $("keyStatus").textContent="✗ "+hataMetni(r.status,v); return; }
+    const u=v.usage||{}; const fm=aktifModel(); const c=(u.input_tokens||0)*fm.girdi+(u.output_tokens||0)*fm.cikti;
+    oturumMaliyet+=c; toplamMaliyet+=c; store.set("oturum",oturumMaliyet); store.set("toplam",toplamMaliyet);
+    anahtar=k; store.set("anahtar",k); maliyetGoster();
+    $("keyStatus").textContent="✓ Bağlantı çalışıyor, anahtar kaydedildi.";
+  }catch(e){ $("keyStatus").textContent="✗ Bağlanılamadı, interneti kontrol et."; }
+};
+function yeniOturum(){ oturumMaliyet=0; store.set("oturum",0); uyariKapat(); maliyetGoster(); }
+$("newSession").onclick=yeniOturum;
+$("toggleType").onclick=()=>{ ayar.yazma=!ayar.yazma; store.set("yazma",ayar.yazma); arayuzYenile(); };
+$("toggleKontrol").onclick=()=>{ ayar.kontrol=!ayar.kontrol; store.set("kontrol",ayar.kontrol); arayuzYenile(); };
+$("clearHistory").onclick=()=>{
+  if(!confirm("Konuşma geçmişi silinsin mi?")) return;
+  gecmis=[]; store.set("gecmis",[]); feed.querySelectorAll(".msg").forEach(x=>x.remove()); hint.style.display="";
+};
+
+/* ---------- Başlangıç ---------- */
+gecmis.forEach(m=>{ m.durum="tamam"; balon(m); });
+arayuzYenile();
+if(!anahtar) ayarlariAc();
+})();
+</script>
+</body>
+</html>
