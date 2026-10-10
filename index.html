@@ -228,7 +228,8 @@ const DILLER = [
 const HAZIR_ETIKET = { uygulama:"Çeviri uygulaması kullanıyorum", anlamadim:"Anlamadım, yavaş söyle", bekle:"Bir dakika lütfen" };
 
 const MODELLER = {
-  kaliteli:  { id:"claude-sonnet-5-5", girdi:2/1e6,    cikti:10/1e6 },  // doğal, akıcı çeviri
+  kaliteli:  { id:"claude-sonnet-5-5", girdi:2/1e6,    cikti:10/1e6,  // doğal, akıcı çeviri
+               ekstra:{ thinking:{type:"between_tools"}, output_config:{effort:"low"} } }, // çeviri için uzun düşünmeye gerek yok
   ekonomik:  { id:"claude-haiku-5-5",  girdi:0.10/1e6, cikti:0.50/1e6 } // çok ucuz, daha düz
 };
 const aktifModel = () => MODELLER[ayar.kalite] || MODELLER.kaliteli;
@@ -409,7 +410,7 @@ async function cevir(m){
       method:"POST",
       headers:{ "content-type":"application/json", "x-api-key":anahtar, "anthropic-version":"2023-06-01",
                 "anthropic-dangerous-direct-browser-access":"true" },
-      body:JSON.stringify({ model:aktifModel().id, max_tokens:500, messages:[{role:"user", content:istemOlustur(m)}] })
+      body:JSON.stringify(Object.assign({ model:aktifModel().id, max_tokens:1000, messages:[{role:"user", content:istemOlustur(m)}] }, aktifModel().ekstra||{}))
     });
     const veri=await r.json().catch(()=>({}));
     if(!r.ok){ throw new Error(hataMetni(r.status, veri)); }
@@ -418,7 +419,8 @@ async function cevir(m){
     oturumMaliyet+=maliyet; toplamMaliyet+=maliyet; ceviriSayisi++;
     store.set("oturum",oturumMaliyet); store.set("toplam",toplamMaliyet); store.set("sayi",ceviriSayisi);
     maliyetGoster();
-    const metin=(veri.content||[]).filter(c=>c.type==="text").map(c=>c.text).join("");
+    const metin=(veri.content||[]).filter(c=>c.type==="text"&&typeof c.text==="string").map(c=>c.text).join("").trim();
+    if(!metin) throw new Error("Yapay zeka boş cevap döndü ("+(veri.stop_reason||"?")+"). Tekrar dene.");
     const j=jsonCoz(metin);
     m.tr=(j.ceviri||metin).trim(); m.back=(j.geri||"").trim(); m.note=(j.not||"").trim();
     m.durum="tamam"; balonDoldur(m); kaydet();
@@ -437,7 +439,7 @@ function hataMetni(st, v){
   if(st===429) return "Çok hızlı istek gitti, birkaç saniye bekle.";
   if(st===400 && /credit|balance/i.test(msg)) return "Console bakiyen bitmiş olabilir.";
   if(st===529 || st>=500) return "Servis şu an yoğun, tekrar dene.";
-  return "Çeviri başarısız ("+st+").";
+  return "Çeviri başarısız ("+st+")"+(msg?": "+msg.slice(0,160):".");
 }
 function jsonCoz(t){
   try{ return JSON.parse(t); }catch(e){}
@@ -542,7 +544,7 @@ $("saveKey").onclick=async()=>{
   try{
     const r=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",
       headers:{"content-type":"application/json","x-api-key":k,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
-      body:JSON.stringify({model:aktifModel().id,max_tokens:5,messages:[{role:"user",content:"ping"}]})});
+      body:JSON.stringify(Object.assign({model:aktifModel().id,max_tokens:20,messages:[{role:"user",content:"ping"}]}, aktifModel().ekstra||{}))});
     const v=await r.json().catch(()=>({}));
     if(!r.ok){ $("keyStatus").textContent="✗ "+hataMetni(r.status,v); return; }
     const u=v.usage||{}; const fm=aktifModel(); const c=(u.input_tokens||0)*fm.girdi+(u.output_tokens||0)*fm.cikti;
