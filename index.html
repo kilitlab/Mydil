@@ -185,6 +185,13 @@ header{display:flex;align-items:center;gap:10px;padding:12px 16px 6px}
     <input id="maxSec" type="number" min="5" max="120" step="5" inputmode="numeric">
     <p class="help">Butona tekrar basmayı unutursan kayıt bu sürede kendiliğinden durur.</p>
 
+    <label>Çeviri kalitesi</label>
+    <div class="seg" id="kaliteSeg" role="group" aria-label="Çeviri kalitesi">
+      <button data-v="kaliteli" aria-pressed="true">Kaliteli</button>
+      <button data-v="ekonomik" aria-pressed="false">Ekonomik</button>
+    </div>
+    <p class="help">Kaliteli: doğal, akıcı çeviri, cümle başı yaklaşık 0,2 sent. Ekonomik: 20 kat ucuz ama daha düz.</p>
+
     <label>Harcama</label>
     <div class="stat"><span>Bu oturum</span><span id="stSession">$0</span></div>
     <div class="stat"><span>Toplam (bu telefonda)</span><span id="stTotal">$0</span></div>
@@ -193,6 +200,7 @@ header{display:flex;align-items:center;gap:10px;padding:12px 16px 6px}
     <div class="actions">
       <button id="newSession">Yeni oturum başlat</button>
       <button id="toggleType">Yazarak çeviri: kapalı</button>
+      <button id="toggleKontrol">Kontrol çevirisi: kapalı</button>
       <button id="clearHistory">Konuşmayı temizle</button>
     </div>
   </div>
@@ -219,8 +227,11 @@ const DILLER = [
 ];
 const HAZIR_ETIKET = { uygulama:"Çeviri uygulaması kullanıyorum", anlamadim:"Anlamadım, yavaş söyle", bekle:"Bir dakika lütfen" };
 
-const MODEL = "claude-haiku-5-5";
-const FIYAT = { girdi: 0.10/1e6, cikti: 0.50/1e6 }; // $ / token (Haiku 5.5)
+const MODELLER = {
+  kaliteli:  { id:"claude-sonnet-5-5", girdi:2/1e6,    cikti:10/1e6 },  // doğal, akıcı çeviri
+  ekonomik:  { id:"claude-haiku-5-5",  girdi:0.10/1e6, cikti:0.50/1e6 } // çok ucuz, daha düz
+};
+const aktifModel = () => MODELLER[ayar.kalite] || MODELLER.kaliteli;
 
 /* ---------- Kayıtlı durum ---------- */
 const store = {
@@ -229,7 +240,8 @@ const store = {
 };
 let ayar = {
   dil: store.get("dil","de"), ton: store.get("ton","notr"), cikti: store.get("cikti","ikisi"),
-  butce: store.get("butce",0.50), maxSn: store.get("maxSn",30), yazma: store.get("yazma",false)
+  butce: store.get("butce",0.50), maxSn: store.get("maxSn",30), yazma: store.get("yazma",false),
+  kalite: store.get("kalite","kaliteli"), kontrol: store.get("kontrol",false)
 };
 let anahtar = store.get("anahtar","");
 let oturumMaliyet = store.get("oturum",0);
@@ -255,7 +267,7 @@ function segBagla(id, alan){
   });
   yenile();
 }
-segBagla("langSeg","dil"); segBagla("toneSeg","ton"); segBagla("outSeg","cikti");
+segBagla("langSeg","dil"); segBagla("toneSeg","ton"); segBagla("outSeg","cikti"); segBagla("kaliteSeg","kalite");
 
 function arayuzYenile(){
   const d=dilBul(ayar.dil);
@@ -269,6 +281,7 @@ function arayuzYenile(){
   });
   $("typebar").classList.toggle("show", !!ayar.yazma || !SR);
   $("toggleType").textContent="Yazarak çeviri: "+(ayar.yazma?"açık":"kapalı");
+  $("toggleKontrol").textContent="Kontrol çevirisi: "+(ayar.kontrol?"açık":"kapalı");
   maliyetGoster();
 }
 
@@ -310,7 +323,7 @@ function balonDoldur(m){
     const t=document.createElement("div"); t.className="tools";
     const b=document.createElement("button"); b.textContent="Tekrar dene"; b.onclick=()=>cevir(m); t.append(b); el.append(t); return; }
   tr.textContent=m.tr;
-  if(m.kim==="ben" && m.back){ const p=document.createElement("p"); p.className="back"; p.textContent="Karşı taraf bunu anlayacak: "+m.back; el.append(p); }
+  if(m.kim==="ben" && m.back && ayar.kontrol){ const p=document.createElement("p"); p.className="back"; p.textContent="Karşı taraf bunu anlayacak: "+m.back; el.append(p); }
   if(m.note){ const p=document.createElement("p"); p.className="note"; p.textContent="💡 "+m.note; el.append(p); }
   const t=document.createElement("div"); t.className="tools";
   const d=dilBul(m.dil);
@@ -336,28 +349,50 @@ function buyukGoster(metin){ $("bigText").textContent=metin; $("bigView").classL
 $("closeBig").onclick=()=>$("bigView").classList.remove("show");
 
 /* ---------- Yapay zeka çevirisi ---------- */
-const TON = { resmi:"resmi ve kibar (Almancada 'Sie', İspanyolcada 'usted' gibi saygılı hitap)", notr:"doğal ve nötr, ne çok resmi ne çok samimi", samimi:"samimi ve sıcak, arkadaşça (Almancada 'du', İspanyolcada 'tú')" };
+const TON = {
+  resmi:"resmi ve kibar; iş görüşmesi, resmi daire, tedarikçi gibi. Almancada 'Sie', İspanyolcada 'usted', İngilizcede kibar kalıplar.",
+  notr:"günlük ve doğal; tanımadığın ama rahat konuştuğun biriyle konuşur gibi. Almancada varsayılan olarak 'Sie'.",
+  samimi:"samimi ve sıcak; arkadaşla konuşur gibi. Almancada 'du', İspanyolcada 'tú'."
+};
 
 function istemOlustur(m){
   const d=dilBul(m.dil);
-  const baglam=gecmis.filter(x=>x!==m && x.durum==="tamam").slice(-4)
-    .map(x=>(x.kim==="ben"?"Ben (Türkçe): ":"Karşı taraf ("+dilBul(x.dil).ad+"): ")+x.orig).join("\n") || "(yok)";
+  const baglam=gecmis.filter(x=>x!==m && x.durum==="tamam").slice(-6)
+    .map(x=>(x.kim==="ben"?"Kullanıcı (Türkçe): ":"Karşı taraf ("+dilBul(x.dil).ad+"): ")+x.orig).join("\n") || "(yok, konuşma yeni başlıyor)";
+  const ortak=`Sen deneyimli bir simultane tercümansın. Türk bir kullanıcı ile ${d.ad} konuşan biri arasında yüz yüze tercümanlık yapıyorsun.
+
+Temel kurallar:
+- Kelime kelime çevirme. Cümlenin ANLAMINI ve NİYETİNİ al, hedef dilin anadili konuşanı o durumda bunu nasıl söylerse öyle söyle.
+- Konuşma dilinde çevir: kısa, akıcı, doğal. Yazı dili, kitap dili veya sözlük dili kullanma.
+- Girdi telefonun ses tanımasından geliyor; noktalama yok, kelimeler yanlış duyulmuş olabilir. Bağlamdan en olası anlamı çıkar ve sessizce düzelt.
+- Rakam, fiyat, miktar, tarih, saat ve özel isimleri kesinlikle doğru aktar.`;
   let gorev, sema;
   if(m.kim==="ben"){
-    gorev=`Kullanıcı Türk ve ${d.ad} konuşan biriyle yüz yüze konuşuyor. Aşağıdaki Türkçe cümleyi ${d.ad} diline çevir. Ton: ${TON[ayar.ton]}. Ses tanıma hatalarını bağlamdan düzelt. Özel isim, marka ve rakamları koru.`;
-    sema=`{"ceviri": "${d.ad} çeviri", "geri": "çevirinin karşı tarafta nasıl anlaşılacağının kısa Türkçe karşılığı", "not": "yanlış anlaşılma riski varsa tek cümlelik Türkçe uyarı, yoksa boş"}`;
+    gorev=`${ortak}
+- Ton: ${TON[ayar.ton]}
+
+Kullanıcı Türkçe konuştu. Bunu karşı tarafa ${d.ad} olarak söyleyeceksin.`;
+    sema = ayar.kontrol
+      ? `{"ceviri": "karşı tarafa söylenecek doğal ${d.ad} cümle", "geri": "bu ${d.ad} cümlenin anadili Türkçe olan birinin ağzından çıkacak doğal Türkçe karşılığı", "not": ""}`
+      : `{"ceviri": "karşı tarafa söylenecek doğal ${d.ad} cümle", "not": ""}`;
   } else {
-    gorev=`Kullanıcı Türk ve ${d.ad} konuşan biriyle yüz yüze konuşuyor. Karşı tarafın aşağıdaki ${d.ad} cümlesini doğal Türkçeye çevir. Ses tanıma hatalarını bağlamdan düzelt. Rakam, fiyat, tarih ve miktarları kesinlikle doğru aktar.`;
-    sema=`{"ceviri": "Türkçe çeviri", "not": "cümlenin tonu dikkat çekiciyse (soğuk, kaba, ironik, çok resmi) ya da rakam/fiyat/tarih içeriyorsa tek cümlelik Türkçe not, yoksa boş"}`;
+    gorev=`${ortak}
+- Türkçe çeviri, İstanbul'da yaşayan bir Türk'ün günlük konuşmada kuracağı cümle gibi olsun: doğal kelime sırası, gerçek Türkçe deyimler. Asla çeviri kokmasın.
+- Karşı taraf "Sie" ile hitap ettiyse "siz", "du" ile hitap ettiyse "sen" kullan.
+
+Karşı taraf ${d.ad} konuştu. Bunu kullanıcıya Türkçe aktaracaksın.`;
+    sema=`{"ceviri": "doğal Türkçe çeviri", "not": ""}`;
   }
   return `${gorev}
 
-Önceki konuşma (sadece bağlam için, çevirme):
+Önceki konuşma (sadece bağlamı anlamak için, bunları çevirme):
 ${baglam}
 
 Çevrilecek: ${m.orig}
 
-Yalnızca şu biçimde tek bir JSON nesnesi yaz, başka hiçbir şey yazma:
+"not" alanını neredeyse her zaman boş bırak. Sadece gerçekten önemli bir durum varsa doldur: cümle kaba veya soğuk söylendiyse, ironi varsa, ya da kullanıcının cümlesi kültürel olarak yanlış anlaşılabilecekse. O zaman tek kısa Türkçe cümle yaz.
+
+Yalnızca tek bir JSON nesnesi yaz, başka hiçbir şey yazma:
 ${sema}`;
 }
 
@@ -374,12 +409,12 @@ async function cevir(m){
       method:"POST",
       headers:{ "content-type":"application/json", "x-api-key":anahtar, "anthropic-version":"2023-06-01",
                 "anthropic-dangerous-direct-browser-access":"true" },
-      body:JSON.stringify({ model:MODEL, max_tokens:500, messages:[{role:"user", content:istemOlustur(m)}] })
+      body:JSON.stringify({ model:aktifModel().id, max_tokens:500, messages:[{role:"user", content:istemOlustur(m)}] })
     });
     const veri=await r.json().catch(()=>({}));
     if(!r.ok){ throw new Error(hataMetni(r.status, veri)); }
     const u=veri.usage||{};
-    const maliyet=(u.input_tokens||0)*FIYAT.girdi + (u.output_tokens||0)*FIYAT.cikti;
+    const fm=aktifModel(); const maliyet=(u.input_tokens||0)*fm.girdi + (u.output_tokens||0)*fm.cikti;
     oturumMaliyet+=maliyet; toplamMaliyet+=maliyet; ceviriSayisi++;
     store.set("oturum",oturumMaliyet); store.set("toplam",toplamMaliyet); store.set("sayi",ceviriSayisi);
     maliyetGoster();
@@ -507,10 +542,10 @@ $("saveKey").onclick=async()=>{
   try{
     const r=await fetch("https://api.anthropic.com/v1/messages",{method:"POST",
       headers:{"content-type":"application/json","x-api-key":k,"anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
-      body:JSON.stringify({model:MODEL,max_tokens:5,messages:[{role:"user",content:"ping"}]})});
+      body:JSON.stringify({model:aktifModel().id,max_tokens:5,messages:[{role:"user",content:"ping"}]})});
     const v=await r.json().catch(()=>({}));
     if(!r.ok){ $("keyStatus").textContent="✗ "+hataMetni(r.status,v); return; }
-    const u=v.usage||{}; const c=(u.input_tokens||0)*FIYAT.girdi+(u.output_tokens||0)*FIYAT.cikti;
+    const u=v.usage||{}; const fm=aktifModel(); const c=(u.input_tokens||0)*fm.girdi+(u.output_tokens||0)*fm.cikti;
     oturumMaliyet+=c; toplamMaliyet+=c; store.set("oturum",oturumMaliyet); store.set("toplam",toplamMaliyet);
     anahtar=k; store.set("anahtar",k); maliyetGoster();
     $("keyStatus").textContent="✓ Bağlantı çalışıyor, anahtar kaydedildi.";
@@ -519,6 +554,7 @@ $("saveKey").onclick=async()=>{
 function yeniOturum(){ oturumMaliyet=0; store.set("oturum",0); uyariKapat(); maliyetGoster(); }
 $("newSession").onclick=yeniOturum;
 $("toggleType").onclick=()=>{ ayar.yazma=!ayar.yazma; store.set("yazma",ayar.yazma); arayuzYenile(); };
+$("toggleKontrol").onclick=()=>{ ayar.kontrol=!ayar.kontrol; store.set("kontrol",ayar.kontrol); arayuzYenile(); };
 $("clearHistory").onclick=()=>{
   if(!confirm("Konuşma geçmişi silinsin mi?")) return;
   gecmis=[]; store.set("gecmis",[]); feed.querySelectorAll(".msg").forEach(x=>x.remove()); hint.style.display="";
